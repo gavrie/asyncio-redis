@@ -1,10 +1,9 @@
-from typing import Dict, Callable, Optional, Any, List
+from typing import Dict, Callable, Optional, Any, List, Tuple, Union
 import logging
-
-logging.basicConfig(level=logging.INFO)
 
 logger = logging.getLogger("resp")
 
+RedisValue = Union[int, str, Optional[bytes]]
 SEP_LENGTH = len(b'\r\n')
 
 
@@ -12,24 +11,24 @@ class RespError(Exception):
     pass
 
 
-def parse_simple_string(data: bytes) -> (str, bytes):
+def parse_simple_string(data: bytes) -> Tuple[str, bytes]:
     data, buf = data.split(b'\r\n', 1)
     return data.decode(), buf
 
 
-def parse_error(data: bytes) -> (str, bytes):
+def parse_error(data: bytes) -> Tuple[str, bytes]:
     data, buf = data.split(b'\r\n', 1)
     return data.decode(), buf
 
 
-def parse_int(data: bytes) -> (int, bytes):
+def parse_int(data: bytes) -> Tuple[int, bytes]:
     data, buf = data.split(b'\r\n', 1)
     return int(data), buf
 
 
-def parse_bulk_string(data: bytes) -> (Optional[bytes], bytes):
-    length, data = data.split(b'\r\n', 1)
-    length = int(length)
+def parse_bulk_string(data: bytes) -> Tuple[Optional[bytes], bytes]:
+    encoded_length, data = data.split(b'\r\n', 1)
+    length = int(encoded_length)
 
     if length == -1:
         return None, data
@@ -38,9 +37,9 @@ def parse_bulk_string(data: bytes) -> (Optional[bytes], bytes):
     return data, buf
 
 
-def parse_array(data: bytes) -> (List[Any], bytes):
-    length, data = data.split(b'\r\n', 1)
-    length = int(length)
+def parse_array(data: bytes) -> Tuple[Optional[List[RedisValue]], bytes]:
+    encoded_length, data = data.split(b'\r\n', 1)
+    length = int(encoded_length)
 
     logger.debug("parse_array: length=%s", length)
 
@@ -75,3 +74,8 @@ def parse_resp(data: bytes):
 
     parse = PARSERS[data[0:1]]
     return parse(data[1:])
+
+
+def parse(data: bytes):
+    response, _remaining_data = parse_resp(data)
+    return response
